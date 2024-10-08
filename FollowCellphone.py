@@ -34,7 +34,8 @@ kalman.transitionMatrix = np.array([[1, 0, 1, 0],
                                     [0, 0, 0, 1]], np.float32)
 # Process noise covariance
 kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 0.03
-
+# Load Haar cascade for face detection
+face_cascade = cv.CascadeClassifier(cv.data.haarcascades + 'haarcascade_frontalface_default.xml')
 # Initial prediction
 last_prediction = np.zeros((2, 1), np.float32)
 
@@ -51,16 +52,26 @@ while cap.isOpened():
     u_v = cv.getTrackbarPos("U-V","TrackBar")
     MIN_AREA = cv.getTrackbarPos("MIN_AREA","TrackBar")
     MAX_AREA = cv.getTrackbarPos("MAX_AREA","TrackBar") 
- 
+    
+
 
     lower_red = np.array([l_h,49,27])
     upper_red = np.array ([u_h,u_s,u_v])
- #LS=49
- #LV= 27
+ #LS=49 CLOSEST CORRECT VALUE FOR FILTRATION 
+ #LV= 27 CLOSEST CORRECT VALUE FOR FILTRATION
     mask = cv.inRange(hsv,lower_red,upper_red)
 
     # Find contours in the mask
     contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    # Detect faces in the frame
+    gray_frame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray_frame, scaleFactor=1.1, minNeighbors=5)
+    # Store face rectangles for overlap checking
+    face_rects = []
+    for (x, y, w, h) in faces:
+        face_rects.append((x, y, x + w, y + h))
+
+
     # Variable to store the detected contour center
     detected_center = None
 
@@ -75,14 +86,22 @@ while cap.isOpened():
                 cx = int(M["m10"] / M["m00"])
                 cy = int(M["m01"] / M["m00"])
                 detected_center = np.array([[cx], [cy]], np.float32)
-            # Draw the contour
-            cv.drawContours(frame, [contour], -1, (0, 255, 0), 2)
 
-            # Get the bounding box for the contour
-            x, y, w, h = cv.boundingRect(contour)
-            
-            # Draw a rectangle around the contour
-            cv.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            # Check if the contour overlaps with any detected face
+                for (fx1, fy1, fx2, fy2) in face_rects:
+                    if fx1 <= cx <= fx2 and fy1 <= cy <= fy2:
+                        detected_center = None  # Reset detected center if overlap occurs
+                        break
+
+            # Draw the contour if no overlap with face
+            if detected_center is not None:
+                cv.drawContours(frame, [contour], -1, (0, 255, 0), 2)
+
+                # Get the bounding box for the contour
+                x, y, w, h = cv.boundingRect(contour)
+                
+                # Draw a rectangle around the contour
+                cv.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
             # Kalman filter prediction step
         prediction = kalman.predict()
         predicted_center = (int(prediction[0]), int(prediction[1]))

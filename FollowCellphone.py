@@ -15,12 +15,28 @@ cv.createTrackbar("L-V","TrackBar",0,255,nothing)
 cv.createTrackbar("U-H","TrackBar",180,180,nothing)
 cv.createTrackbar("U-S","TrackBar",255,255,nothing)
 cv.createTrackbar("U-V","TrackBar",255,255,nothing)
-cv.createTrackbar("MIN_AREA","TrackBar",0,1000,nothing)
-cv.createTrackbar("NAX_AREA","TrackBar",0,5000,nothing)
+cv.createTrackbar("MIN_AREA","TrackBar",1000,1000,nothing)
+cv.createTrackbar("MAX_AREA","TrackBar",2628,5000,nothing)#closest value to correct?
 
+# minimum & max area of detection initilization
+MIN_AREA = 1000  
+MAX_AREA = 2500 
 
-MIN_AREA = 1000  # You can adjust this value
-MAX_AREA = 2500  # You can adjust this value
+# Initialize Kalman Filter
+kalman = cv.KalmanFilter(4, 2)
+# State vector [x, y, vx, vy]
+kalman.measurementMatrix = np.array([[1, 0, 0, 0],
+                                     [0, 1, 0, 0]], np.float32)
+# Transition matrix (constant velocity model)
+kalman.transitionMatrix = np.array([[1, 0, 1, 0],
+                                    [0, 1, 0, 1],
+                                    [0, 0, 1, 0],
+                                    [0, 0, 0, 1]], np.float32)
+# Process noise covariance
+kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 0.03
+
+# Initial prediction
+last_prediction = np.zeros((2, 1), np.float32)
 
 #play video
 while cap.isOpened():
@@ -32,7 +48,9 @@ while cap.isOpened():
     l_v = cv.getTrackbarPos("L-V","TrackBar") 
     u_h = cv.getTrackbarPos("U-H","TrackBar") 
     u_s = cv.getTrackbarPos("U-S","TrackBar") 
-    u_v = cv.getTrackbarPos("U-V","TrackBar") 
+    u_v = cv.getTrackbarPos("U-V","TrackBar")
+    MIN_AREA = cv.getTrackbarPos("MIN_AREA","TrackBar")
+    MAX_AREA = cv.getTrackbarPos("MAX_AREA","TrackBar") 
  
 
     lower_red = np.array([l_h,49,27])
@@ -43,21 +61,43 @@ while cap.isOpened():
 
     # Find contours in the mask
     contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    # Variable to store the detected contour center
+    detected_center = None
 
     # Iterate through contours and filter based on size
     for contour in contours:
         area = cv.contourArea(contour)
         
-        # Only process contours within the desired area range (medium-sized)
+        # Only process contours within the desired area range
         if MIN_AREA < area < MAX_AREA:
-            # Draw the medium-sized contour
+            M = cv.moments(contour)
+            if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                detected_center = np.array([[cx], [cy]], np.float32)
+            # Draw the contour
             cv.drawContours(frame, [contour], -1, (0, 255, 0), 2)
 
-            # Get the bounding box for the medium-sized contour
+            # Get the bounding box for the contour
             x, y, w, h = cv.boundingRect(contour)
             
-            # Draw a rectangle around the medium-sized contour
+            # Draw a rectangle around the contour
             cv.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            # Kalman filter prediction step
+        prediction = kalman.predict()
+        predicted_center = (int(prediction[0]), int(prediction[1]))
+
+        # Kalman filter update step
+        if detected_center is not None:
+            # Update the Kalman filter with the detected position
+            kalman.correct(detected_center)
+            last_prediction = detected_center
+        else:
+            # If no detection, continue using the last prediction
+            detected_center = last_prediction
+
+        # Draw the predicted position (circle or other shape to indicate prediction)
+        cv.circle(frame, predicted_center, 5, (0, 0, 255), -1)
 
  
     # Indicador que el video termino

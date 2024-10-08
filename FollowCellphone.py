@@ -38,6 +38,8 @@ kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 0.03
 face_cascade = cv.CascadeClassifier(cv.data.haarcascades + 'haarcascade_frontalface_default.xml')
 # Initial prediction
 last_prediction = np.zeros((2, 1), np.float32)
+movement_threshold = 10 
+last_detected_center = None
 
 #play video
 while cap.isOpened():
@@ -108,9 +110,15 @@ while cap.isOpened():
 
         # Kalman filter update step
         if detected_center is not None:
-            # Update the Kalman filter with the detected position
-            kalman.correct(detected_center)
-            last_prediction = detected_center
+            # Calculate the distance between the detected center and the last prediction
+            distance = np.linalg.norm(detected_center - last_prediction)
+            # Update the Kalman filter only if the movement is significant
+            if distance > movement_threshold:
+                kalman.correct(detected_center)
+                last_prediction = detected_center
+                last_detected_center = detected_center
+            else:
+                detected_center = last_detected_center 
         else:
             # If no detection, continue using the last prediction
             detected_center = last_prediction

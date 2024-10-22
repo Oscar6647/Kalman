@@ -14,7 +14,7 @@ cv.createTrackbar("U-H","TrackBar",30,179,nothing)
 cv.createTrackbar("U-S","TrackBar",255,255,nothing)
 cv.createTrackbar("U-V","TrackBar",255,255,nothing)
 cv.createTrackbar("MIN_AREA","TrackBar",680,1000,nothing)
-cv.createTrackbar("MAX_AREA","TrackBar",1301,5000,nothing)#closest value to correct?
+cv.createTrackbar("MAX_AREA","TrackBar",1301,5000,nothing)
 
 # minimum & max area of detection initilization
 MIN_AREA = 1000  
@@ -23,8 +23,7 @@ MAX_AREA = 2500
 # Initialize Kalman Filter
 kalman = cv.KalmanFilter(4, 2)
 
-# State Transition Matrix (does the change for every diference in time?)
-
+# State Transition Matrix (does the change for every diference in time? in our case being 300 which is the fps we made for the video)
 dt=300
 
 # State vector [x, y, vx, vy]

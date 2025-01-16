@@ -24,7 +24,7 @@ MAX_AREA = 2500
 kalman = cv.KalmanFilter(4, 2)
 
 # State Transition Matrix (does the change for every diference in time? in our case being 300 which is the fps we made for the video)
-dt=300
+dt=60
 
 # State vector [x, y, vx, vy]
 kalman.measurementMatrix = np.array([[1, 0, 0, 0],
@@ -70,7 +70,7 @@ while cap.isOpened():
     upper_red = np.array ([u_h,u_s,u_v])
     mask = cv.inRange(hsv,lower_red,upper_red)
 
-    # Find contours in the mask
+    # Find contours 
     contours, _ = cv.findContours(mask, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
 
     # Variable to store the detected contour center
@@ -89,7 +89,9 @@ while cap.isOpened():
                 detected_center = np.array([[cx], [cy]], np.float32)
                 # Predict the next state
                 predicted_state = kalman.predict()
-
+                x_predicted, y_predicted = int(predicted_state[0]), int(predicted_state[1]) 
+                # Draw the Kalman filter predicted position (before correction)
+                cv.circle(frame, (x_predicted, y_predicted), 5, (0, 0, 255), -1)  # Red dot (predicted)    
                 # Measurement (detected position from the color)
                 measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
                 
@@ -103,7 +105,7 @@ while cap.isOpened():
                 cv.circle(frame, (cx, cy), 5, (0, 255, 0), -1)  # Green dot (measured)
                 
                 # Draw the Kalman filter predicted position
-                cv.circle(frame, (x_estimated, y_estimated), 5, (255, 0, 0), -1)  # Blue dot (predicted)
+        
 
 
                 # Get the bounding box for the contour
@@ -112,7 +114,7 @@ while cap.isOpened():
                 # Draw a rectangle around the contour
                 cv.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
             # Kalman filter prediction step
- 
+            cv.circle(frame, (x_estimated, y_estimated), 5, (255, 0, 0), -1)  # Blue dot (predicted)
     # Indicador que el video termino
     if not ret:
         print("Can't receive frame (stream end?). Exiting ...")
@@ -121,7 +123,7 @@ while cap.isOpened():
     #display
     cv.imshow('frame',frame)
     cv.imshow('MASK',mask)
-    if cv.waitKey(300) == ord('q'):
+    if cv.waitKey(60) == ord('q'):
         break
  
 cap.release()
